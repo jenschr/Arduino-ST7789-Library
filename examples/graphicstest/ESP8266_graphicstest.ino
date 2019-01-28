@@ -1,18 +1,25 @@
 /***************************************************
-  This is a library for the ST7789 IPS SPI display.
-
-  Written by Ananev Ilya.
+  ESP8266 has software watchdog and hardware watchdog. 
+  It is different from Arduino.
+  So every 6.7 seconds it will reset.
+  We have to stop this two watchdog before running st7789
  ****************************************************/
 
 #include <Adafruit_GFX.h>    // Core graphics library by Adafruit
 #include <Arduino_ST7789.h> // Hardware-specific library for ST7789 (with or without CS pin)
 #include <SPI.h>
+#include <Esp.h>
+#include <esp8266_peri.h>
 
-#define TFT_DC    8
-#define TFT_RST   9 
+#define TFT_DC    0
+#define TFT_RST   2
 //#define TFT_CS    10 // only for displays with CS pin
-#define TFT_MOSI  11   // for hardware SPI data pin (all of available pins)
-#define TFT_SCLK  13   // for hardware SPI sclk pin (all of available pins)
+#define TFT_MOSI  4   // for hardware SPI data pin (all of available pins)
+#define TFT_SCLK  5   // for hardware SPI sclk pin (all of available pins)
+
+#define REG_WDT_BASE 0x60000900
+#define WDT_CTL (REG_WDT_BASE + 0x0)
+#define WDT_CTL_ENABLE (BIT(0))
 
 //You can use different type of hardware initialization
 //using hardware SPI (11, 13 on UNO; 51, 52 on MEGA; ICSP-4, ICSP-3 on DUE and etc)
@@ -25,6 +32,8 @@ Arduino_ST7789 tft = Arduino_ST7789(TFT_DC, TFT_RST, TFT_MOSI, TFT_SCLK); //for 
 float p = 3.1415926;
 
 void setup(void) {
+  CLEAR_PERI_REG_MASK(WDT_CTL, WDT_CTL_ENABLE);
+  ESP.wdtDisable();
   Serial.begin(9600);
   Serial.print("Hello! ST7789 TFT Test");
 
@@ -41,24 +50,24 @@ void setup(void) {
 
   // large block of text
   tft.fillScreen(BLACK);
-  testdrawtext("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur adipiscing ante sed nibh tincidunt feugiat. Maecenas enim massa, fringilla sed malesuada et, malesuada sit amet turpis. Sed porttitor neque ut ante pretium vitae malesuada nunc bibendum. Nullam aliquet ultrices massa eu hendrerit. Ut sed nisi lorem. In vestibulum purus a tortor imperdiet posuere. ", WHITE);
-  delay(1000);
+  testdrawtext("Hello, DSTIKE ", WHITE);
+  delay(500);
 
   // tft print function
   tftPrintTest();
   delay(4000);
-
+  
   // a single pixel
   tft.drawPixel(tft.width()/2, tft.height()/2, GREEN);
   delay(500);
-
+  
   // line draw test
-  testlines(YELLOW);
+ testlines(YELLOW);
   delay(500);
 
   // optimized lines
-  testfastlines(RED, BLUE);
-  delay(500);
+ testfastlines(RED, BLUE);
+ delay(500);
 
   testdrawrects(GREEN);
   delay(500);
@@ -218,22 +227,22 @@ void tftPrintTest() {
   tft.setCursor(0, 30);
   tft.setTextColor(RED);
   tft.setTextSize(1);
-  tft.println("Hello World!");
+  tft.println("Hello DSTIKE!");
   tft.setTextColor(YELLOW);
   tft.setTextSize(2);
-  tft.println("Hello World!");
+  tft.println("Hello DSTIKE!");
   tft.setTextColor(GREEN);
   tft.setTextSize(3);
-  tft.println("Hello World!");
+  tft.println("Hello DSTIKE!");
   tft.setTextColor(BLUE);
   tft.setTextSize(4);
-  tft.print(1234.567);
+  tft.println("Hello DSTIKE!");
   delay(1500);
   tft.setCursor(0, 0);
   tft.fillScreen(BLACK);
   tft.setTextColor(WHITE);
   tft.setTextSize(0);
-  tft.println("Hello World!");
+  tft.println("Hello DSTIKE!");
   tft.setTextSize(1);
   tft.setTextColor(GREEN);
   tft.print(p, 6);
