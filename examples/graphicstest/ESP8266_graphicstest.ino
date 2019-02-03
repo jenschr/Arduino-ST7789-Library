@@ -21,6 +21,7 @@
 #define WDT_CTL (REG_WDT_BASE + 0x0)
 #define WDT_CTL_ENABLE (BIT(0))
 
+
 //You can use different type of hardware initialization
 //using hardware SPI (11, 13 on UNO; 51, 52 on MEGA; ICSP-4, ICSP-3 on DUE and etc)
 //Arduino_ST7789 tft = Arduino_ST7789(TFT_DC, TFT_RST); //for display without CS pin
@@ -34,6 +35,7 @@ float p = 3.1415926;
 void setup(void) {
   CLEAR_PERI_REG_MASK(WDT_CTL, WDT_CTL_ENABLE);
   ESP.wdtDisable();
+ 
   Serial.begin(9600);
   Serial.print("Hello! ST7789 TFT Test");
 
@@ -55,7 +57,7 @@ void setup(void) {
 
   // tft print function
   tftPrintTest();
-  delay(4000);
+  delay(2000);
   
   // a single pixel
   tft.drawPixel(tft.width()/2, tft.height()/2, GREEN);
@@ -90,14 +92,17 @@ void setup(void) {
   delay(500);
 
   Serial.println("done");
-  delay(1000);
-}
+  delay(500);
 
-void loop() {
   tft.invertDisplay(true);
   delay(500);
   tft.invertDisplay(false);
   delay(500);
+
+}
+
+void loop() {
+
 }
 
 void testlines(uint16_t color) {
@@ -279,4 +284,9 @@ void mediabuttons() {
   tft.fillRoundRect(69, 98, 20, 45, 5, RED);
   // play color
   tft.fillTriangle(42, 20, 42, 60, 90, 40, GREEN);
+
+  tft.setCursor(60, 200);
+  tft.setTextColor(RED);
+  tft.setTextSize(4);
+  tft.println("DSTIKE");
 }
