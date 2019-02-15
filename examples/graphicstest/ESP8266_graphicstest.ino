@@ -7,6 +7,7 @@
 
 #include <Adafruit_GFX.h>    // Core graphics library by Adafruit
 #include <Arduino_ST7789.h> // Hardware-specific library for ST7789 (with or without CS pin)
+#include <Adafruit_NeoPixel.h>
 #include <SPI.h>
 #include <Esp.h>
 #include <esp8266_peri.h>
@@ -16,6 +17,13 @@
 //#define TFT_CS    10 // only for displays with CS pin
 #define TFT_MOSI  4   // for hardware SPI data pin (all of available pins)
 #define TFT_SCLK  5   // for hardware SPI sclk pin (all of available pins)
+
+#define PIXEL_PIN    15
+#define PIXEL_COUNT 1
+
+#define BUTTON_PRESS   14 
+#define BUTTON_LEFT    12                        
+#define BUTTON_RIGHT   13       
 
 #define REG_WDT_BASE 0x60000900
 #define WDT_CTL (REG_WDT_BASE + 0x0)
@@ -30,6 +38,11 @@
 Arduino_ST7789 tft = Arduino_ST7789(TFT_DC, TFT_RST, TFT_MOSI, TFT_SCLK); //for display without CS pin
 //Arduino_ST7789 tft = Arduino_ST7789(TFT_DC, TFT_RST, TFT_MOSI, TFT_SCLK, TFT_CS); //for display with CS pin
 
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXEL_COUNT, PIXEL_PIN, NEO_GRB + NEO_KHZ800);
+
+bool oldState = HIGH;
+int showType = 0;
+
 float p = 3.1415926;
 
 void setup(void) {
@@ -37,6 +50,10 @@ void setup(void) {
   ESP.wdtDisable();
  
   Serial.begin(9600);
+
+  pinMode(BUTTON_PRESS, INPUT_PULLUP);
+  pinMode(BUTTON_LEFT, INPUT_PULLUP);
+  pinMode(BUTTON_RIGHT, INPUT_PULLUP);
   Serial.print("Hello! ST7789 TFT Test");
 
   tft.init(240, 240);   // initialize a ST7789 chip, 240x240 pixels
@@ -99,9 +116,31 @@ void setup(void) {
   tft.invertDisplay(false);
   delay(500);
 
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
+
 }
 
 void loop() {
+
+  bool newState = digitalRead(BUTTON_PRESS);
+
+  // Check if state changed from high to low (button press).
+  if (newState == LOW && oldState == HIGH) {
+    // Short delay to debounce button.
+    delay(20);
+    // Check if button is still low after debounce.
+    newState = digitalRead(BUTTON_PRESS);
+    if (newState == LOW) {
+      showType++;
+      if (showType > 6)
+        showType=0;
+      startShow(showType);
+    }
+  }
+
+  // Set the last button state to the old state.
+  oldState = newState;
 
 }
 
@@ -289,4 +328,114 @@ void mediabuttons() {
   tft.setTextColor(RED);
   tft.setTextSize(4);
   tft.println("DSTIKE");
+}
+void startShow(int i) {
+  switch(i){
+    case 0: colorWipe(strip.Color(0, 0, 0), 50);    // Black/off
+            break;
+    case 1: colorWipe(strip.Color(255, 0, 0), 50);  // Red
+            break;
+    case 2: colorWipe(strip.Color(0, 255, 0), 50);  // Green
+            break;
+    case 3: colorWipe(strip.Color(0, 0, 255), 50);  // Blue
+            break;
+    case 4: theaterChase(strip.Color(127, 127, 127), 50); // White
+            break;
+    case 5: theaterChase(strip.Color(127,   0,   0), 50); // Red
+            break;
+    case 6: theaterChase(strip.Color(  0,   0, 127), 50); // Blue
+            break;
+     /*
+    case 7: rainbow(20);
+            break;
+    case 8: rainbowCycle(20);
+            break;
+    case 9: theaterChaseRainbow(50);
+            break;*/
+  }
+}
+
+// Fill the dots one after the other with a color
+void colorWipe(uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<strip.numPixels(); i++) {
+    strip.setPixelColor(i, c);
+    strip.show();
+    delay(wait);
+  }
+}
+
+void rainbow(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256; j++) {
+    for(i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+//Theatre-style crawling lights.
+void theaterChase(uint32_t c, uint8_t wait) {
+  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
+    for (int q=0; q < 3; q++) {
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        strip.setPixelColor(i+q, c);    //turn every third pixel on
+      }
+      strip.show();
+
+      delay(wait);
+
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        strip.setPixelColor(i+q, 0);        //turn every third pixel off
+      }
+    }
+  }
+}
+
+//Theatre-style crawling lights with rainbow effect
+void theaterChaseRainbow(uint8_t wait) {
+  for (int j=0; j < 256; j++) {     // cycle all 256 colors in the wheel
+    for (int q=0; q < 3; q++) {
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        strip.setPixelColor(i+q, Wheel( (i+j) % 255));    //turn every third pixel on
+      }
+      strip.show();
+
+      delay(wait);
+
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        strip.setPixelColor(i+q, 0);        //turn every third pixel off
+      }
+    }
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  WheelPos = 255 - WheelPos;
+  if(WheelPos < 85) {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  }
+  if(WheelPos < 170) {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
 }
