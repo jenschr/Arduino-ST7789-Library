@@ -1,15 +1,32 @@
 /***************************************************
   This is a library for the ST7789 IPS SPI display.
 
-  Written by Ananev Ilya.
+  Written by Ananev Ilya. Forked from 
+  https://github.com/lspoplove/Arduino-ST7789-Library
+  and adapted for Particle Photon by @jenschr to
+  https://github.com/jenschr/Arduino-ST7789-Library
+
+  Tested with this display from Adafruit:
+  https://learn.adafruit.com/adafruit-1-14-240x135-color-tft-breakout/pinouts
  ****************************************************/
 
 #ifndef _ADAFRUIT_ST7789H_
 #define _ADAFRUIT_ST7789H_
 
-#include "Arduino.h"
-#include "Print.h"
+#if ARDUINO >= 100
+ #include "Arduino.h"
+ #include "Print.h"
+#elif defined (SPARK)
+#include "application.h"
+#else
+ #include "WProgram.h"
+#endif
+
+#if defined(SPARK)
+#include "Adafruit_mfGFX.h"
+#else
 #include <Adafruit_GFX.h>
+#endif
 
 #if defined(__AVR__) || defined(CORE_TEENSY)
   #include <avr/pgmspace.h>
@@ -36,8 +53,8 @@
 #define ST7789_TFTWIDTH_240 	240
 #define ST7789_TFTHEIGHT_240 	240
 
-#define ST7789_240x240_XSTART 0
-#define ST7789_240x240_YSTART 0
+#define ST7789_240x240_XSTART 53
+#define ST7789_240x240_YSTART 40
 
 #define ST_CMD_DELAY   0x80    // special signifier for command lists
 
@@ -101,7 +118,7 @@ class Arduino_ST7789 : public Adafruit_GFX {
            fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color),
            setRotation(uint8_t r),
            invertDisplay(boolean i),
-		   init(uint16_t width, uint16_t height);
+		       init(uint16_t width, uint16_t height);
   uint16_t Color565(uint8_t r, uint8_t g, uint8_t b);
   uint16_t color565(uint8_t r, uint8_t g, uint8_t b) { return Color565(r, g, b); } 
 
@@ -124,6 +141,7 @@ class Arduino_ST7789 : public Adafruit_GFX {
   boolean  _hwSPI;
 
   int8_t  _cs, _dc, _rst, _sid, _sclk;
+  int16_t _WIDTH, _HEIGHT;
 
 #if defined(USE_FAST_IO)
   volatile RwReg  *dataport, *clkport, *csport, *dcport;

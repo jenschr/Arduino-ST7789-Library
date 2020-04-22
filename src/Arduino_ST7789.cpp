@@ -6,13 +6,11 @@
 
 #include "Arduino_ST7789.h"
 #include <limits.h>
-#include "pins_arduino.h"
-#include "wiring_private.h"
 #include <SPI.h>
 
 static const uint8_t PROGMEM
-  cmd_240x240[] = {                 		// Initialization commands for 7789 screens
-    10,                       				// 9 commands in list:
+  cmd2_240x240[] = {                 		// Initialization commands for 7789 screens
+    7,                       				// 6 commands in list:
     ST7789_SWRESET,   ST_CMD_DELAY,  		// 1: Software reset, no args, w/delay
       150,                     				// 150 ms delay
     ST7789_SLPOUT ,   ST_CMD_DELAY,  		// 2: Out of sleep mode, no args, w/delay
@@ -22,20 +20,41 @@ static const uint8_t PROGMEM
       10,                     				// 10 ms delay
     ST7789_MADCTL , 1,  					// 4: Memory access ctrl (directions), 1 arg:
       0x00,                   				// Row addr/col addr, bottom to top refresh
-    ST7789_CASET  , 4,  					// 5: Column addr set, 4 args, no delay:
-      0x00, ST7789_240x240_XSTART,          // XSTART = 0
-	  (240+ST7789_240x240_XSTART) >> 8,
-	  (240+ST7789_240x240_XSTART) & 0xFF,   // XEND = 240
-    ST7789_RASET  , 4,  					// 6: Row addr set, 4 args, no delay:
-      0x00, ST7789_240x240_YSTART,          // YSTART = 0
-      (240+ST7789_240x240_YSTART) >> 8,
-	  (240+ST7789_240x240_YSTART) & 0xFF,	// YEND = 240
     ST7789_INVON ,   ST_CMD_DELAY,  		// 7: Inversion ON
       10,
     ST7789_NORON  ,   ST_CMD_DELAY,  		// 8: Normal display on, no args, w/delay
       10,                     				// 10 ms delay
     ST7789_DISPON ,   ST_CMD_DELAY,  		// 9: Main screen turn on, no args, w/delay
     255 };                  				// 255 = 500 ms delay
+
+static const uint8_t PROGMEM
+  generic_st7789[] =  {                // Init commands for 7789 screens
+    9,                              //  9 commands in list:
+    ST7789_SWRESET,   ST_CMD_DELAY, //  1: Software reset, no args, w/delay
+      150,                          //     ~150 ms delay
+    ST7789_SLPOUT ,   ST_CMD_DELAY, //  2: Out of sleep mode, no args, w/delay
+      10,                          //      10 ms delay
+    ST7789_COLMOD , 1+ST_CMD_DELAY, //  3: Set color mode, 1 arg + delay:
+      0x55,                         //     16-bit color
+      10,                           //     10 ms delay
+    ST7789_MADCTL , 1,              //  4: Mem access ctrl (directions), 1 arg:
+      0x08,                         //     Row/col addr, bottom-top refresh
+    ST7789_CASET  , 4,              //  5: Column addr set, 4 args, no delay:
+      0x00,
+      0,        //     XSTART = 0
+      0,
+      240,  //     XEND = 240
+    ST7789_RASET  , 4,              //  6: Row addr set, 4 args, no delay:
+      0x00,
+      0,             //     YSTART = 0
+      320>>8,
+      320&0xFF,  //     YEND = 320
+    ST7789_INVON  ,   ST_CMD_DELAY,  //  7: hack
+      10,
+    ST7789_NORON  ,   ST_CMD_DELAY, //  8: Normal display on, no args, w/delay
+      10,                           //     10 ms delay
+    ST7789_DISPON ,   ST_CMD_DELAY, //  9: Main screen turn on, no args, delay
+      10 };                          //    10 ms delay
 
 inline uint16_t swapcolor(uint16_t x) { 
   return (x << 11) | (x & 0x07E0) | (x >> 11);
@@ -53,8 +72,8 @@ inline uint16_t swapcolor(uint16_t x) {
 #define SPI_BEGIN_TRANSACTION()    if (_hwSPI)    SPI.beginTransaction(mySPISettings)
 #define SPI_END_TRANSACTION()      if (_hwSPI)    SPI.endTransaction()
 #else
-#define SPI_BEGIN_TRANSACTION()    (void)
-#define SPI_END_TRANSACTION()      (void)
+#define SPI_BEGIN_TRANSACTION()    
+#define SPI_END_TRANSACTION()      
 #endif
 
 // Constructor when using software SPI.  All output pins are configurable.
@@ -80,78 +99,47 @@ Arduino_ST7789::Arduino_ST7789(int8_t dc, int8_t rst, int8_t cs)
   _sid  = _sclk = -1;
 }
 
-inline void Arduino_ST7789::spiwrite(uint8_t c) {
-
-  //Serial.println(c, HEX);
-
-  if (_hwSPI) {
-#if defined (SPI_HAS_TRANSACTION)
-      SPI.transfer(c);
-#elif defined (__AVR__) || defined(CORE_TEENSY)
-      SPCRbackup = SPCR;
-      SPCR = mySPCR;
-      SPI.transfer(c);
-      SPCR = SPCRbackup;
-#elif defined (__arm__)
-      SPI.setClockDivider(21); //4MHz
-      SPI.setDataMode(SPI_MODE2);
-      SPI.transfer(c);
-#endif
-  } else {
-
-    // Fast SPI bitbang swiped from LPD8806 library
-    for(uint8_t bit = 0x80; bit; bit >>= 1) {
-#if defined(USE_FAST_IO)
-	  *clkport &= ~clkpinmask;
-      if(c & bit) *dataport |=  datapinmask;
-      else        *dataport &= ~datapinmask;
-      *clkport |=  clkpinmask;
-#else
-	  digitalWrite(_sclk, LOW);
-      if(c & bit) digitalWrite(_sid, HIGH);
-      else        digitalWrite(_sid, LOW);
-      digitalWrite(_sclk, HIGH);
-#endif
-    }
-  }
+inline void Arduino_ST7789::spiwrite(uint8_t c)
+{
+  SPI.transfer(c);
 }
 
 void Arduino_ST7789::writecommand(uint8_t c) {
+  SPI_BEGIN_TRANSACTION();
 
   DC_LOW();
   CS_LOW();
-  SPI_BEGIN_TRANSACTION();
-
   spiwrite(c);
-
   CS_HIGH();
+
   SPI_END_TRANSACTION();
 }
 
 void Arduino_ST7789::writedata(uint8_t c) {
   SPI_BEGIN_TRANSACTION();
+
   DC_HIGH();
   CS_LOW();
-    
   spiwrite(c);
-
   CS_HIGH();
+
   SPI_END_TRANSACTION();
 }
 
 // Companion code to the above tables.  Reads and issues
 // a series of LCD commands stored in PROGMEM byte array.
 void Arduino_ST7789::displayInit(const uint8_t *addr) {
-
   uint8_t  numCommands, numArgs;
   uint16_t ms;
   //<-----------------------------------------------------------------------------------------
+  /*
   DC_HIGH();
   #if defined(USE_FAST_IO)
       *clkport |=  clkpinmask;
   #else
       digitalWrite(_sclk, HIGH);
   #endif
+  */
   //<-----------------------------------------------------------------------------------------
 
   numCommands = pgm_read_byte(addr++);   // Number of commands to follow
@@ -172,7 +160,6 @@ void Arduino_ST7789::displayInit(const uint8_t *addr) {
   }
 }
 
-
 // Initialization code common to all ST7789 displays
 void Arduino_ST7789::commonInit(const uint8_t *cmdList) {
   _ystart = _xstart = 0;
@@ -182,6 +169,7 @@ void Arduino_ST7789::commonInit(const uint8_t *cmdList) {
   if(_cs) {
 	  pinMode(_cs, OUTPUT);
   }
+  SPI.begin();
 
 #if defined(USE_FAST_IO)
   dcport    = portOutputRegister(digitalPinToPort(_dc));
@@ -195,8 +183,7 @@ void Arduino_ST7789::commonInit(const uint8_t *cmdList) {
 
   if(_hwSPI) { // Using hardware SPI
 #if defined (SPI_HAS_TRANSACTION)
-    SPI.begin();
-    mySPISettings = SPISettings(24000000, MSBFIRST, SPI_MODE2);
+    mySPISettings = SPISettings(30000000, MSBFIRST, SPI_MODE2);
 #elif defined (__AVR__) || defined(CORE_TEENSY)
     SPCRbackup = SPCR;
     SPI.begin();
@@ -240,36 +227,52 @@ void Arduino_ST7789::commonInit(const uint8_t *cmdList) {
 }
 
 void Arduino_ST7789::setRotation(uint8_t m) {
+  uint8_t madctl = 0;
 
-  writecommand(ST7789_MADCTL);
-  rotation = m % 4; // can't be higher than 3
+  rotation = m & 3; // can't be higher than 3
+
   switch (rotation) {
-   case 0:
-     writedata(ST7789_MADCTL_MX | ST7789_MADCTL_MY | ST7789_MADCTL_RGB);
-
-     _xstart = _colstart;
-     _ystart = _rowstart;
-     break;
-   case 1:
-     writedata(ST7789_MADCTL_MY | ST7789_MADCTL_MV | ST7789_MADCTL_RGB);
-
-     _ystart = _colstart;
-     _xstart = _rowstart;
-     break;
+  case 0:
+    madctl = ST7789_MADCTL_MX | ST7789_MADCTL_MY | ST7789_MADCTL_RGB;
+    _xstart = _colstart;
+    _ystart = _rowstart;
+    _width = _WIDTH;
+    _height = _HEIGHT;
+    break;
+  case 1:
+    madctl = ST7789_MADCTL_MY | ST7789_MADCTL_MV | ST7789_MADCTL_RGB;
+    _xstart = _rowstart;
+    _ystart = _colstart;
+    _height = _WIDTH;
+    _width = _HEIGHT;
+    break;
   case 2:
-     writedata(ST7789_MADCTL_RGB);
- 
-     _xstart = _colstart;
-     _ystart = _rowstart;
-     break;
-
-   case 3:
-     writedata(ST7789_MADCTL_MX | ST7789_MADCTL_MV | ST7789_MADCTL_RGB);
-
-     _ystart = _colstart;
-     _xstart = _rowstart;
-     break;
+    madctl = ST7789_MADCTL_RGB;
+    if ((_WIDTH == 135) && (_HEIGHT == 240)) {
+      _xstart = _colstart;
+      _ystart = _rowstart;
+    } else {
+      _xstart = 0;
+      _ystart = 0;
+    }
+    _width = _WIDTH;
+    _height = _HEIGHT;
+    break;
+  case 3:
+    madctl = ST7789_MADCTL_MX | ST7789_MADCTL_MV | ST7789_MADCTL_RGB;
+    if ((_WIDTH == 135) && (_HEIGHT == 240)) {
+      _xstart = _rowstart;
+      _ystart = _colstart;
+    } else {
+      _xstart = 0;
+      _ystart = 0;
+    }
+    _height = _WIDTH;
+    _width = _HEIGHT;
+    break;
   }
+  writecommand(ST7789_MADCTL);
+  writedata( madctl );
 }
 
 void Arduino_ST7789::setAddrWindow(uint8_t x0, uint8_t y0, uint8_t x1,
@@ -412,50 +415,41 @@ void Arduino_ST7789::invertDisplay(boolean i) {
 /******** low level bit twiddling **********/
 
 inline void Arduino_ST7789::CS_HIGH(void) {
-	if(_cs) {
-		#if defined(USE_FAST_IO)
-			*csport |= cspinmask;
-		#else
-		digitalWrite(_cs, HIGH);
-		#endif
-	}
+	pinSetFast(_cs);
 }
 
 inline void Arduino_ST7789::CS_LOW(void) {
-	if(_cs) {
-		#if defined(USE_FAST_IO)
-		*csport &= ~cspinmask;
-		#else
-		digitalWrite(_cs, LOW);
-		#endif
-	}
+	pinResetFast(_cs);
 }
 
 inline void Arduino_ST7789::DC_HIGH(void) {
-#if defined(USE_FAST_IO)
-  *dcport |= dcpinmask;
-#else
-  digitalWrite(_dc, HIGH);
-#endif
+  pinSetFast(_dc);
 }
 
 inline void Arduino_ST7789::DC_LOW(void) {
-#if defined(USE_FAST_IO)
-  *dcport &= ~dcpinmask;
-#else
-  digitalWrite(_dc, LOW);
-#endif
+  pinResetFast(_dc);
 }
 
 void Arduino_ST7789::init(uint16_t width, uint16_t height) {
   commonInit(NULL);
 
-  _colstart = ST7789_240x240_XSTART;
-  _rowstart = ST7789_240x240_YSTART;
-  _height = 240;
-  _width = 240;
+  if ((width == 240) && (height == 240)) { // 1.3" and 1.54" displays
+    _colstart = 0;
+    _rowstart = 80;
+  } else if ((width == 135) && (height == 240)) { // 1.13" display
+    _colstart = 53;
+    _rowstart = 40;
+  } else {
+    _colstart = 0;
+    _rowstart = 0;
+  }
+  
+  // Next two lines are to work around a bug in the current mfGFX
+  // where WIDTH and HEIGHT are set to "const", preventing change
+  _WIDTH = width;
+  _HEIGHT = height;
 
-  displayInit(cmd_240x240);
+  displayInit( generic_st7789 );
 
-  setRotation(2);
+  setRotation(0);
 }
