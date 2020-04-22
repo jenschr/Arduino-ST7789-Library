@@ -5,7 +5,9 @@
   Clone the project and use with VS Code, or start from this version in the Particle Online IDE [https://go.particle.io/shared_apps/5ea074f146180b001641ca26](https://go.particle.io/shared_apps/5ea074f146180b001641ca26)
   
   Requires [https://github.com/pkourany/Adafruit_mfGFX_IDE](https://github.com/pkourany/Adafruit_mfGFX_IDE) to be installed.
-s
+  
+  ![How to connect](./doc/Photon_ST7789_ST7735_bb.png =250x)
+  
 ## Tested hardware
 
   Tested with this 135 x 240 pixel display from Adafruit:
