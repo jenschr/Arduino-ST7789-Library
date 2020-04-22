@@ -6,7 +6,7 @@
   
   Requires [https://github.com/pkourany/Adafruit_mfGFX_IDE](https://github.com/pkourany/Adafruit_mfGFX_IDE) to be installed.
   
-  ![How to connect](./doc/Photon_ST7789_ST7735_bb.png)
+  ![How to connect](./doc/Photon_ST7789_ST7735_bb.png | width=100)
   
 ## Tested hardware
 
